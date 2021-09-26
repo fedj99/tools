@@ -1,2 +1,7 @@
-/data/
-/out/
+# Input/output files
+**/data/
+**/out/
+
+# Temporary files
+**/tmp/
+**/.tmp/
