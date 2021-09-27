@@ -12,6 +12,8 @@ This tool is intended to modify Ralf Hiptmair's awful videos to something slight
 
 ### Usage
 
+From the releases page or directly from the main source, download the `butcher.sh` script and place it anywhere on your computer. Open a terminal in the same directory and you can start using it right away.
+
 Upon first use, you might have to run the following command:
 
 ```bash
@@ -51,3 +53,14 @@ butcher.sh has the following dependencies:
 - figlet
 
 However, you do not need to install them manually, as the script will already do this for you automatically (simply answer `y` when prompted or `--install-deps` in CLI mode).
+
+## random.sh
+
+Simple script to generate random md5 hashes of arbitrary length. Simply download the script and make it executable with `chmod +x random.sh`.
+
+Invoke with
+
+```bash
+./random.sh <length>
+```
+If invoked with no arguments, default length is `8`.

@@ -20,6 +20,8 @@ DEFAULT_CLI_FILTERS='removesilence' # Comma-separated, just like argument
 DEFAULT_INT_RS='Yes'                # Remove silence
 DEFAULT_INT_NORM='No'               # Normalize volume
 DEFAULT_INT_AF='No'                 # Audio filters
+DEFAULT_SAVE_INTERM='No'            # Save intermediate files
+FFMPEG_FRONTEND=ffpb                # What command to use for ffmpeg commands (e.g. ffpb)
 
 #################
 
@@ -55,13 +57,18 @@ usage() {
 	echo "	                                                (bandpass, reduce clicking, reduce clipping)"
 	echo "	                    The following options are enabled by default: 'removesilence'"
 	echo "	-r --dry-run		Only show commands but do not execute them"
+	echo "	-s --save-interm    If enabled, intermediate results will be persisted as output files in"
+	echo "	                    case of failure of a pass. If a pass succeeds, the intermediate file will"
+	echo "	                    be overwritten. If all passes succeed, only the final output is persisted."
+	echo "	                    Warning: this option may incur additional copying of large files."
 	echo ""
 	echo "	Every option must be given separately."
 	echo ""
-	echo "AUTHOR	Federico Mantovani <fmantova@student.ethz.ch>"
+	echo "AUTHOR"
+	echo "	Federico Mantovani <fmantova@student.ethz.ch>"
 	echo ""
-	echo "LICENSE	MIT License, Copyright (c) 2021 Federico Mantovani"
-	echo ""
+	echo "LICENSE"
+	echo "	MIT License, Copyright (c) 2021 Federico Mantovani"
 }
 
 # VERSION
@@ -135,6 +142,7 @@ tmp_filename() {
 }
 
 cleanup() {
+	# Remove temporary files
 	if [ -d $TMP_DIR ]; then
 		rm -r $TMP_DIR
 	fi
@@ -249,7 +257,7 @@ set_output_dir() {
 		fi
 	fi
 	if [ ! -z "$(find $src -maxdepth 1 -type f -exec file -N -i -- {} + | sed -n 's!: video/[^:]*$!!p')" ]; then
-		echo "Output directory contains other video files. Files might get overwritten."
+		echo "NOTICE: Output directory contains other video files. Files might get overwritten."
 	fi
 }
 
@@ -281,7 +289,7 @@ set_enabled_options() {
 		# Audio filters (simple ffmpeg filters)
 		read -p "2nd pass: Perform small audio enhancements (bandpass, remove pops) (y/n, default: $DEFAULT_INT_AF) " enable_filters
 		if [[ $enable_filters =~ [Yy].* ]]; then
-			filters+=$audio_filters
+			filters+=${audio_filters[@]}
 			enable_filters="Yes"
 		elif [ -z $enable_filters ]; then
 			enable_filters=$DEFAULT_INT_AF
@@ -292,12 +300,24 @@ set_enabled_options() {
 		# Volume normalization (simple ffmpeg filters)
 		read -p "2nd pass: Perform volume normalization? (y/n, default: $DEFAULT_INT_NORM) " enable_normalize
 		if [[ $enable_normalize =~ [Yy].* ]]; then
-			filters+=$normalize_filters
+			filters+=("${normalize_filters[@]}")
 			enable_normalize="Yes"
 		elif [ -z $enable_normalize ]; then
 			enable_normalize=$DEFAULT_INT_NORM
 		else
 			enable_normalize='No'
+		fi
+
+		# Intermediate files
+		echo "By default, all files are deleted in case a pass fails, including working files from previous passes. You can decide to save intermediate results if you are having troubles with passes."
+		read -p "Save intermediate results? (y/n, default: $DEFAULT_SAVE_INTERM) " save_interm
+		if [ -z "$save_interm" ]; then
+			save_interm=$DEFAULT_SAVE_INTERM
+		fi
+		if [[ $save_interm =~ [Yy].* ]]; then
+			opts['save-interm']=true
+		else
+			opts['save-interm']=false
 		fi
 	else
 		# Static
@@ -306,11 +326,11 @@ set_enabled_options() {
 			case $opt in
 			r | removesilence) enable_remove_silence='Yes' ;;
 			n | normalize)
-				filters+=$normalize_filters
+				filters+=("${normalize_filters[@]}")
 				enable_normalize='Yes'
 				;;
 			a | audiofilters)
-				filters+=$audio_filters
+				filters+=("${audio_filters[@]}")
 				enable_filters='Yes'
 				;;
 			*)
@@ -322,7 +342,10 @@ set_enabled_options() {
 	fi
 
 	# Concatenate all filters with comma
-	filters_string=$(IFS=$',' echo "${filters[*]}")
+	filters_string=$(
+		IFS=$','
+		echo "${filters[*]}"
+	)
 }
 
 summary() {
@@ -378,12 +401,20 @@ process() {
 		else
 			echo "1st pass: Nothing to do, skipping..."
 		fi
+
+		# Copy intermediate files
+		if ! ${opts['dry-run']} && ${opts['save-interm']}; then
+			echo "Copying intermediate files..."
+			interm_fn=$(filename_append $outfile $outdir $outdir 'interm')
+			cp $curfile $interm_fn
+		fi
+
 		# Pass 2: Filters
 		if [ $enable_normalize = 'Yes' ] || [ $enable_filters = 'Yes' ]; then
 			echo "2nd pass: Audio filters"
 			# If any video filters are used, -vcodec copy must be removed
 			tmpname=$(tmp_filename $file)
-			cmd="ffpb -i \"$curfile\" -af \"$filters_string\" -vcodec copy -y \"$tmpname\""
+			cmd="$FFMPEG_FRONTEND -i \"$curfile\" -af \"$filters_string\" -vcodec copy -y \"$tmpname\""
 			if ${opts['dry-run']}; then
 				echo $cmd
 			else
@@ -393,6 +424,7 @@ process() {
 		else
 			echo "2nd pass: Nothing to do, skipping..."
 		fi
+
 		# Copy file to final file
 		if ! ${opts['dry-run']}; then
 			cp $curfile $outfile
@@ -401,7 +433,14 @@ process() {
 			duration_string=$(convert_seconds $duration)
 			tot_out_duration=$(($tot_out_duration + $duration))
 		fi
-		echo "File processed (result: '$outfile', $duration_string)"
+
+		# Remove intermediate file
+		if ! ${opts['dry-run']} && ${opts['save-interm']} && [ -f $interm_fn ]; then
+			echo "Removing intermediate files..."
+			rm $interm_fn
+		fi
+
+		echo "SUCCESS: File processed (result: '$outfile', $duration_string)"
 	done
 
 	tot_out_duration_string=$(convert_seconds $tot_out_duration)
@@ -454,6 +493,7 @@ declare -A opts=(
 	['create-outdir']=false
 	['options']=$DEFAULT_CLI_FILTERS
 	['dry-run']=false
+	['save-interm']=false
 )
 
 interactive=false
@@ -494,6 +534,10 @@ while [ "$#" -gt 0 ]; do
 		opts['dry-run']=true
 		shift 1
 		;;
+	-s | --save-interm)
+		opts['save-interm']=true
+		shift 1
+		;;
 	-*)
 		echo "Unkown option '$1'" >&2
 		exit 1
@@ -519,7 +563,7 @@ fi
 $program
 
 TIME_END=$(date +%s)
-TIME_DIFF=$(($END - $START))
+TIME_DIFF=$(($TIME_END - $TIME_START))
 time_taken=$(convert_seconds $TIME_DIFF)
 
 echo "Completed in $time_taken"
