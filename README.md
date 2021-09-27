@@ -4,7 +4,7 @@ A collection of single-purpose tools
 
 ## butcher.sh (a.k.a. "The Butcher")
 
-This tool is intended to modify Ralf Hiptmair's awful videos to something slightly more bearable. To be more precise, the tool is capable of:
+This tool is intended to modify your professor's awful video recordings to something slightly more bearable. To be more precise, the tool is capable of:
 
 - Removing silent parts
 - Apply audio filtering like pop and click removal, high- and low-pass filters
