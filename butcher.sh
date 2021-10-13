@@ -11,7 +11,7 @@ set -e
 
 APP_NAME='The Butcher'
 APP_AUTHOR='Federico Mantovani'
-VERSION='1.0.1'
+VERSION='1.0.2'
 TMP_DIR='tmp'
 FILENAME_SUFFIX='butchered'
 DEFAULT_SOURCE='./data'
