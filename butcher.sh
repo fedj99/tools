@@ -158,21 +158,21 @@ check_requirements() {
 
 	check_requirement "ffmpeg" \
 		"sudo apt update" \
-		"sudo apt install ffmpeg"
+		"sudo apt install ffmpeg -y"
 
 	check_requirement "figlet" \
 		"sudo apt update" \
-		"sudo apt install figlet"
+		"sudo apt install figlet -y"
 
 	check_requirement "python3" \
 		"sudo apt update" \
-		"sudo apt install software-properties-common" \
+		"sudo apt install software-properties-common -y" \
 		"sudo add-apt-repository ppa:deadsnakes/ppa" \
 		"sudo apt update" \
-		"sudo apt install python3"
+		"sudo apt install python3 -y"
 
 	check_requirement "pip3" \
-		"python -m ensurepip --upgrade"
+		"python3 -m ensurepip --upgrade || sudo apt install python3-pip -y"
 
 	check_requirement "jumpcutter" \
 		"pip3 install jumpcutter"
@@ -289,7 +289,7 @@ set_enabled_options() {
 		# Audio filters (simple ffmpeg filters)
 		read -p "2nd pass: Perform small audio enhancements (bandpass, remove pops) (y/n, default: $DEFAULT_INT_AF) " enable_filters
 		if [[ $enable_filters =~ [Yy].* ]]; then
-			filters+=${audio_filters[@]}
+			filters+=(${audio_filters[@]})
 			enable_filters="Yes"
 		elif [ -z $enable_filters ]; then
 			enable_filters=$DEFAULT_INT_AF
@@ -330,7 +330,7 @@ set_enabled_options() {
 				enable_normalize='Yes'
 				;;
 			a | audiofilters)
-				filters+=("${audio_filters[@]}")
+				filters+=(${audio_filters[@]})
 				enable_filters='Yes'
 				;;
 			*)
@@ -450,13 +450,14 @@ process() {
 
 run() {
 
+	# Need to check requirements before starting (figlet is used in title screen)
+	check_requirements
+
 	if $interactive; then
 		echo "Welcome to"
 		figlet -f slant "$APP_NAME"
 		echo "When prompted, simply type <enter> to accept default settings."
 	fi
-
-	check_requirements
 
 	set_input_files
 
