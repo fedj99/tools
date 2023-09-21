@@ -1,9 +1,11 @@
+#!/bin/bash
+
 set -e
 
 APP_NAME='set-llvm-version'
 APP_VERSION='1.0.0'
 
-function usage {
+usage() {
 	echo "$APP_NAME - version $APP_VERSION"
 	echo ""
 	echo "SYNOPSIS"
@@ -30,21 +32,21 @@ function usage {
 	echo "	MIT License, Copyright (c) 2021 Federico Mantovani"
 }
 
-function check_install_dir {
+check_install_dir() {
 	if [ -z $installdir ]; then
 		echo "Unable to locate installation directory - Please provide one with --install-dir (see --help for more info)"
 		exit 1
 	fi
 }
 
-function check_ver {
+check_ver() {
 	if ! [[ $ver =~ [0-9]+ ]]; then
 		echo "Version must be an integer"
 		exit 1
 	fi
 }
 
-function config {
+config() {
 	check_ver
 	check_install_dir
 
@@ -52,7 +54,7 @@ function config {
 	sudo update-alternatives --config "$1"
 }
 
-function all {
+all() {
 	echo "Setting llvm version to $ver..."
 	progs=$(ls $installdir | grep "\(llvm\|llc\|clang\).*-$ver")
 	for prog in $progs; do
